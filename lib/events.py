@@ -10,6 +10,7 @@ FillEvent
 """
 
 import datetime as dt
+import json
 
 
 class Event(object):
@@ -20,6 +21,20 @@ class Event(object):
     def __init__(self):
         self.timestamp = dt.datetime.today()
         self.logged = False
+        self.type = None
+
+    def __str__(self):
+        return json.dumps({'timestamp': str(self.timestamp), 'event': self.type}) + "\n"
+
+
+class StartStopEvent(Event):
+    """
+    Starts/Stops asynchronous queue querying
+    """
+
+    def __init__(self):
+        super(StartStopEvent, self).__init__()
+        self.type = 'STOP'
 
 
 class MarketDataEvent(Event):
@@ -68,8 +83,13 @@ class OrderEvent(Event):
         self.symbol = symbol
         self.order_type = order_type
         self.quantity = quantity
-        self.direction = side
+        self.side = side
         self.other_args = kwargs
+
+    def __str__(self):
+        #TODO include other kwargs
+        return json.dumps({'timestamp': str(self.timestamp), 'event': "ORDER", 'symbol': self.symbol,
+                           'order_type': self.order_type, 'quantity': self.quantity, 'side': self.side}) + "\n"
 
 
 class FillEvent(Event):
@@ -98,6 +118,12 @@ class FillEvent(Event):
         self.side = side
         self.total_cost = total_cost
         self.orderid = orderid
+
+    def __str__(self):
+        return json.dumps({'timestamp': str(self.timestamp), 'event': "FILL", 'symbol': self.symbol,
+                           'order_timestamp': str(self.order_timestamp), 'quantity': self.quantity,
+                           'side': self.side, 'total_cost': self.total_cost, 'exchange': self.exchange,
+                           'orderid': self.orderid}) + "\n"
 
 
 if __name__ == "__main__":
