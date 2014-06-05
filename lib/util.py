@@ -3,6 +3,37 @@ __author__ = 'jph'
 from Queue import Queue
 import threading
 import datetime as dt
+import time
+import functools
+
+
+def synch(returnloc, timeout=5, required=()):
+    """
+    Decorator that converts data requests to synchronous calls
+    Decorated func has to return a unique ID
+    returnloc: location to search for expected return value (returnloc[id])
+    timeout: timeout in secs
+    required: expected fields in the output
+    """
+
+    def decorate(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            id = func(*args, **kwargs)
+            start = time.time()
+            while time.time() - start < timeout:
+                if returnloc[id]:
+                    if required:
+                        if all(fields in returnloc[id] for fields in required):
+                            return returnloc[id]
+                    else:
+                        time.sleep(0.1)
+                        return returnloc[id]
+            return {}
+
+        return wrapper
+
+    return decorate
 
 
 class QueuePreprocessor(object):
