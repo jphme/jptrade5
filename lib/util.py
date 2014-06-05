@@ -25,9 +25,10 @@ def synch(returnloc, timeout=5, required=()):
                 if returnloc[id]:
                     if required:
                         if all(fields in returnloc[id] for fields in required):
+                            time.sleep(0.05)
                             return returnloc[id]
                     else:
-                        time.sleep(0.1)
+                        time.sleep(0.2)
                         return returnloc[id]
             return {}
 
