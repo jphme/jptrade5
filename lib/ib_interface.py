@@ -15,8 +15,8 @@ from util import synch
 
 
 class IBInterface(object):
-    def __init__(self):
-        self.con = ibConnection(host='localhost', port=7499, clientId=1)
+    def __init__(self, host='localhost', port=7499, clientId=1):
+        self.con = ibConnection(host=host, port=port, clientId=clientId)
         #self.con.enableLogging()
         self.con.register(self.account_handler, 'UpdateAccountValue')
         self.con.register(self.portfolio_handler, 'UpdatePortfolio')
@@ -71,8 +71,9 @@ class IBInterface(object):
         contract.m_exchange = exch
         contract.m_currency = "USD"
 
-        self.con.reqHistoricalData(self.request_id, contract, date, interv=interval, resol=resol, rth=rth, datestyle=2,
-                                   show=show)
+        self.con.reqHistoricalData(self.request_id, contract, date, durationStr=interval, barSizeSetting=resol,
+                                   useRTH=rth, formatDate=2,
+                                   whatToShow=show)
         self.hist_prices[self.request_id] = {}
         self.request_id += 1
 
@@ -112,6 +113,8 @@ class IBInterface(object):
         self.con.placeOrder(id, contract, order)
         self.orders[id] = {}
         self.con.reqIds(1)
+        time.sleep(0.1) #todo: get more IDs so sleep is not necessary
+        ib.con.reqOpenOrders()
         return id
 
     def cancel_order(self, orderid):
@@ -159,7 +162,6 @@ class IBInterface(object):
         pass
 
     def orderid_handler(self, msg):
-        print msg #todo debug raus
         self.nextID = msg.orderId
 
     def account_handler(self, msg):
@@ -196,7 +198,6 @@ class IBInterface(object):
         self.accounts[msg.accountName]['portfolio'][symbol]['realpnl'] = msg.realizedPNL
 
     def orderstatus_handler(self, msg):
-        print msg #todo raus DEBUG
         if msg.orderId not in self.orders:
             self.orders[msg.orderId] = {}
         self.orders[msg.orderId]['status'] = msg.status
@@ -209,9 +210,6 @@ class IBInterface(object):
         self.orders[msg.orderId]['whyheld'] = msg.whyHeld
 
     def openorder_handler(self, msg):
-        print msg #todo raus DEBUG
-        print msg.contract
-        print msg.order
         if msg.orderId not in self.orders.keys():
             self.orders[msg.orderId] = {}
         self.orders[msg.orderId]['symbol'] = msg.contract.m_symbol
@@ -223,7 +221,6 @@ class IBInterface(object):
         self.orders[msg.orderId]['oca'] = msg.order.m_ocaGroup
 
     def historical_handler(self, msg):
-        print msg #todo raus DEBUG
         if msg.date[:8] == "finished":
             pass
         else:
@@ -248,25 +245,25 @@ class IBComfort(IBInterface):
         self.cet = pytz.timezone('Europe/Berlin')
 
 
-    def comf_reqhistdata(self, startday, endday, symbol, interval="1 W", resol="1 hour", rth=0, show="TRADES"):
+    def comf_reqhistdata(self, last_date, first_date, symbol, interval="1 W", resol="1 hour", rth=0, show="TRADES"):
         resols = {'1 day': dt.timedelta(days=90), '1 hour': dt.timedelta(days=6), '15 mins': dt.timedelta(days=6),
                   '1 min': dt.timedelta(days=1), '1 secs': dt.timedelta(minutes=30)}
         if interval == "1 M": resols['1 hour'] = dt.timedelta(days=28)
-        if startday.hour == 0 and startday.minute == 0:
-            startday = startday.replace(hour=23, minute=59)
-        if startday.tzinfo == None:
-            startday = self.est.localize(startday)
-            endday = self.est.localize(endday)
+        if last_date.hour == 0 and last_date.minute == 0:
+            last_date = last_date.replace(hour=23, minute=59)
+        if last_date.tzinfo == None:
+            last_date = self.est.localize(last_date)
+            first_date = self.est.localize(first_date)
         else:
-            startday = startday.astimezone(self.est)
-            endday = endday.astimezone(self.est)
+            last_date = last_date.astimezone(self.est)
+            first_date = first_date.astimezone(self.est)
         erg = {}
         z = 1
-        while startday >= endday:
-            print startday.strftime("Getting historical Data for %Y%m%d %H:%M:%S EST ...")
-            id = self.reqhistdata(symbol, startday, interval, resol, rth=rth, show=show)
+        while last_date >= first_date:
+            print last_date.strftime("Getting historical Data for %Y%m%d %H:%M:%S EST ...")
+            id = self.reqhistdata(symbol, last_date, interval, resol, rth=rth, show=show)
             z += 1
-            startday = startday - resols[resol]
+            last_date = last_date - resols[resol]
             if not self.wait_for_hist(id, interval): #waits for results
                 print "Fehler, keine Daten empfangen"
                 print self.hist_prices
@@ -297,22 +294,21 @@ class IBComfort(IBInterface):
             time.sleep(0.02)
         return False
 
-    def get_spy(self):
+    def getspy(self):
         @synch(self.prices, required=('last', 'open', 'high', 'low'))
         def synch_mkt_data(*args, **kwargs): return self.reqmktdata(*args, **kwargs)
-
         return synch_mkt_data('SPY', snapshot=True)
 
 
 if __name__ == '__main__':
     #TODO only for testing
 
-    ib = IBInterface()
+    ib = IBComfort()
     ib.connect()
     time.sleep(3)
 
 
-    @synch(ib.prices, required=('last', 'open', 'high', 'low'))
+    @synch(ib.prices, timeout=2, required=('last', 'open', 'high', 'low'))
     def synch_mkt_data(*args, **kwargs):
         return ib.reqmktdata(*args, **kwargs)
 
@@ -322,7 +318,8 @@ if __name__ == '__main__':
     print b - a
 
     testid = ib.nextID
-    orderid = ib.place_order("BUY", "SPY", 100, "MKT")
+    orderid = ib.place_order("BUY", "SPY", 47, "MKT")
+    orderid = ib.place_order("BUY", "SPY", 57, "MKT")
     a = time.time()
     while ib.nextID == testid:
         pass
@@ -331,7 +328,11 @@ if __name__ == '__main__':
 
     time.sleep(1)
     print ib.orders
-
     print ib.accounts
 
-    #pdb.set_trace()
+    histdata = ib.comf_reqhistdata(dt.datetime.today(), dt.datetime.today() - dt.timedelta(days=200), 'SPY',
+                                   interval="1 M")
+    print histdata
+    import pdb
+
+    pdb.set_trace()
