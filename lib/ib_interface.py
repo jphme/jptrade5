@@ -35,6 +35,9 @@ class IBInterface(object):
         self.orders = {}
         self.hist_prices = {}
 
+        self.est = pytz.timezone('US/Eastern')
+        self.cet = pytz.timezone('Europe/Berlin')
+
     def connect(self):
         self.con.connect()
         self.con.reqIds(1)
@@ -80,8 +83,12 @@ class IBInterface(object):
         return self.request_id - 1
 
     def place_order(self, side, symbol, size, ordertype, type="STK", exch="SMART", expiry="201403", stpprice=1400,
-                    oca="", goodafter="", lmtprice=0, rth=0, ignorerth=True, account="", group="All",
-                    method="NetLiq", tif="GTC", parentid=0, goodtill="", transmit=True):
+                    oca="", goodafter=None, lmtprice=0, rth=0, ignorerth=True, account="", group="All",
+                    method="NetLiq", tif="GTC", parentid=0, goodtill=None, transmit=True):
+        if goodtill:
+            goodtill = goodtill.astimezone(self.est).strftime("%Y%m%d %H:%M:%S EST")
+        if goodafter:
+            goodafter = goodafter.astimezone(self.est).strftime("%Y%m%d %H:%M:%S EST")
         contract = Contract.Contract()
         contract.m_symbol = symbol
         contract.m_secType = type
@@ -114,7 +121,7 @@ class IBInterface(object):
         self.orders[id] = {}
         self.con.reqIds(1)
         time.sleep(0.1) #todo: get more IDs so sleep is not necessary
-        ib.con.reqOpenOrders()
+        self.con.reqOpenOrders()
         return id
 
     def cancel_order(self, orderid):
@@ -238,12 +245,8 @@ class IBInterface(object):
 
 
 class IBComfort(IBInterface):
-    def __init__(self):
-        super(IBComfort, self).__init__()
-
-        self.est = pytz.timezone('US/Eastern')
-        self.cet = pytz.timezone('Europe/Berlin')
-
+    def __init__(self, **kwargs):
+        super(IBComfort, self).__init__(**kwargs)
 
     def comf_reqhistdata(self, last_date, first_date, symbol, interval="1 W", resol="1 hour", rth=0, show="TRADES"):
         resols = {'1 day': dt.timedelta(days=90), '1 hour': dt.timedelta(days=6), '15 mins': dt.timedelta(days=6),
@@ -299,11 +302,17 @@ class IBComfort(IBInterface):
         def synch_mkt_data(*args, **kwargs): return self.reqmktdata(*args, **kwargs)
         return synch_mkt_data('SPY', snapshot=True)
 
+    def getorders(self):
+        """
+        only for testing
+        """
+        return self.orders
+
 
 if __name__ == '__main__':
     #TODO only for testing
 
-    ib = IBComfort()
+    ib = IBComfort(port=7499, clientId=1)
     ib.connect()
     time.sleep(3)
 
@@ -318,11 +327,11 @@ if __name__ == '__main__':
     print b - a
 
     testid = ib.nextID
-    orderid = ib.place_order("BUY", "SPY", 47, "MKT")
-    orderid = ib.place_order("BUY", "SPY", 57, "MKT")
+    #orderid = ib.place_order("BUY", "SPY", 47, "MKT")
+    #orderid = ib.place_order("BUY", "SPY", 57, "MKT")
     a = time.time()
-    while ib.nextID == testid:
-        pass
+    #while ib.nextID == testid:
+    #    pass
     b = time.time()
     print b - a
 
@@ -330,9 +339,7 @@ if __name__ == '__main__':
     print ib.orders
     print ib.accounts
 
-    histdata = ib.comf_reqhistdata(dt.datetime.today(), dt.datetime.today() - dt.timedelta(days=200), 'SPY',
-                                   interval="1 M")
-    print histdata
-    import pdb
-
-    pdb.set_trace()
+    #histdata = ib.comf_reqhistdata(dt.datetime.today(), dt.datetime.today() - dt.timedelta(days=200), 'SPY',
+    #                               interval="1 M")
+    #print histdata
+    #pdb.set_trace()
