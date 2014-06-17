@@ -30,7 +30,7 @@ def synch(returnloc, timeout=5, required=()):
                     else:
                         time.sleep(0.2)
                         return returnloc[id]
-            return {}
+            return {req: None for req in required}
 
         return wrapper
 

@@ -84,7 +84,7 @@ class IBInterface(object):
 
     def place_order(self, side, symbol, size, ordertype, type="STK", exch="SMART", expiry="201403", stpprice=1400,
                     oca="", goodafter=None, lmtprice=0, rth=0, ignorerth=True, account="", group="All",
-                    method="NetLiq", tif="GTC", parentid=0, goodtill=None, transmit=True):
+                    method="NetLiq", tif="GTC", parentid=0, goodtill=None, transmit=True, orderref=""):
         if goodtill:
             goodtill = goodtill.astimezone(self.est).strftime("%Y%m%d %H:%M:%S EST")
         if goodafter:
@@ -110,6 +110,7 @@ class IBInterface(object):
         order.m_transmit = transmit
         order.m_ocaGroup = oca
         order.m_ocaType = 3
+        order.m_orderRef = orderref
         if account:
             order.m_account = account
         else:
@@ -118,6 +119,7 @@ class IBInterface(object):
 
         id = self.nextID
         self.con.placeOrder(id, contract, order)
+        self.nextID += 1
         self.orders[id] = {}
         self.con.reqIds(1)
         time.sleep(0.1) #todo: get more IDs so sleep is not necessary
@@ -226,6 +228,8 @@ class IBInterface(object):
         self.orders[msg.orderId]['limit'] = msg.order.m_lmtPrice
         self.orders[msg.orderId]['stpprice'] = msg.order.m_auxPrice
         self.orders[msg.orderId]['oca'] = msg.order.m_ocaGroup
+        self.orders[msg.orderId]['orderref'] = msg.order.m_orderRef
+
 
     def historical_handler(self, msg):
         if msg.date[:8] == "finished":
@@ -298,7 +302,7 @@ class IBComfort(IBInterface):
         return False
 
     def getspy(self):
-        @synch(self.prices, required=('last', 'open', 'high', 'low'))
+        @synch(self.prices, required=('last', 'open', 'high', 'low', 'askprice', 'bidprice'))
         def synch_mkt_data(*args, **kwargs): return self.reqmktdata(*args, **kwargs)
         return synch_mkt_data('SPY', snapshot=True)
 
@@ -326,8 +330,8 @@ if __name__ == '__main__':
     b = time.time()
     print b - a
 
-    testid = ib.nextID
-    #orderid = ib.place_order("BUY", "SPY", 47, "MKT")
+    #testid = ib.nextID
+    #orderid = ib.place_order("BUY", "SPY", 47, "MKT", orderref="testtest")
     #orderid = ib.place_order("BUY", "SPY", 57, "MKT")
     a = time.time()
     #while ib.nextID == testid:
@@ -339,6 +343,22 @@ if __name__ == '__main__':
     print ib.orders
     print ib.accounts
 
+    def test_orders():
+        import hashlib
+
+        for i in range(50):
+            testid = ib.nextID
+            ref = hashlib.md5(str(testid) + str(dt.datetime.today())).hexdigest()
+            print ref
+            orderid = ib.place_order("BUY", "SPY", 100, "MKT", orderref=ref)
+
+    def cancel_orders():
+        for order in ib.orders:
+            ib.cancel_order(order)
+
+    import pdb
+
+    pdb.set_trace()
     #histdata = ib.comf_reqhistdata(dt.datetime.today(), dt.datetime.today() - dt.timedelta(days=200), 'SPY',
     #                               interval="1 M")
     #print histdata
