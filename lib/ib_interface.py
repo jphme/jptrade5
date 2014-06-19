@@ -302,7 +302,8 @@ class IBComfort(IBInterface):
         return False
 
     def getspy(self):
-        @synch(self.prices, required=('last', 'open', 'high', 'low', 'askprice', 'bidprice'))
+        @synch(self.prices,
+               required=('last', 'asksize', 'timestamp', 'askprice', 'volume', 'lastsize', 'bidprice', 'bidsize'))
         def synch_mkt_data(*args, **kwargs): return self.reqmktdata(*args, **kwargs)
         return synch_mkt_data('SPY', snapshot=True)
 
