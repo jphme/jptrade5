@@ -1,6 +1,7 @@
 __author__ = 'jph'
 
 import datetime as dt
+import random
 
 from lib.events import FillEvent
 
@@ -30,9 +31,11 @@ class FakeInstantTradingHandler(TradingHandler):
         super(FakeInstantTradingHandler, self).__init__(queue=queue)
         self.fakeid = 37
 
+
     def execute_order(self, event):
         if event.type == 'ORDER':
+            price = 190 + round(random.random() * 10, 2)
             fill_event = FillEvent(dt.datetime.today(), event.symbol,
-                                   'BATS', event.quantity, event.side, 2, self.fakeid)
+                                   'BATS', event.quantity, event.side, 2, self.fakeid, price)
             self.fakeid += 1
             self.queue.put(fill_event)

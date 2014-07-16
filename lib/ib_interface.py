@@ -66,13 +66,17 @@ class IBInterface(object):
         return self.request_id - 1
 
     def reqhistdata(self, symbol, rawdate, interval="1 D", resol="1 day", rth=1, type="STK", exch="SMART",
-                    show='TRADES'):
+                    show='TRADES', expiry=None, expired=False):
         date = rawdate.strftime("%Y%m%d %H:%M:%S EST")
         contract = Contract.Contract()
         contract.m_symbol = symbol
         contract.m_secType = type
         contract.m_exchange = exch
         contract.m_currency = "USD"
+        contract.m_includeExpired = expired
+        if expiry:
+            contract.m_expiry = expiry #format "201409"
+        contract.m_multiplier = 50
 
         self.con.reqHistoricalData(self.request_id, contract, date, durationStr=interval, barSizeSetting=resol,
                                    useRTH=rth, formatDate=2,
@@ -252,7 +256,8 @@ class IBComfort(IBInterface):
     def __init__(self, **kwargs):
         super(IBComfort, self).__init__(**kwargs)
 
-    def comf_reqhistdata(self, last_date, first_date, symbol, interval="1 W", resol="1 hour", rth=0, show="TRADES"):
+    def comf_reqhistdata(self, last_date, first_date, symbol, interval="1 W", resol="1 hour", rth=0, show="TRADES",
+                         type="STK", exch="SMART", expiry=None, expired=False):
         resols = {'1 day': dt.timedelta(days=90), '1 hour': dt.timedelta(days=6), '15 mins': dt.timedelta(days=6),
                   '1 min': dt.timedelta(days=1), '1 secs': dt.timedelta(minutes=30)}
         if interval == "1 M": resols['1 hour'] = dt.timedelta(days=28)
@@ -268,7 +273,8 @@ class IBComfort(IBInterface):
         z = 1
         while last_date >= first_date:
             print last_date.strftime("Getting historical Data for %Y%m%d %H:%M:%S EST ...")
-            id = self.reqhistdata(symbol, last_date, interval, resol, rth=rth, show=show)
+            id = self.reqhistdata(symbol, last_date, interval, resol, rth=rth, show=show, type=type, exch=exch,
+                                  expiry=expiry, expired=expired)
             z += 1
             last_date = last_date - resols[resol]
             if not self.wait_for_hist(id, interval): #waits for results
@@ -344,23 +350,16 @@ if __name__ == '__main__':
     print ib.orders
     print ib.accounts
 
-    def test_orders():
-        import hashlib
-
-        for i in range(50):
-            testid = ib.nextID
-            ref = hashlib.md5(str(testid) + str(dt.datetime.today())).hexdigest()
-            print ref
-            orderid = ib.place_order("BUY", "SPY", 100, "MKT", orderref=ref)
-
     def cancel_orders():
         for order in ib.orders:
             ib.cancel_order(order)
 
     import pdb
 
+    histdata = ib.comf_reqhistdata(dt.datetime.today(), dt.datetime.today() - dt.timedelta(days=5), 'ES',
+                                   interval="1 M", type="FUT", exch="GLOBEX")
+    ib.disconnect()
     pdb.set_trace()
-    #histdata = ib.comf_reqhistdata(dt.datetime.today(), dt.datetime.today() - dt.timedelta(days=200), 'SPY',
-    #                               interval="1 M")
+
     #print histdata
     #pdb.set_trace()

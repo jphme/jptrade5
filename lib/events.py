@@ -52,7 +52,7 @@ class SignalEvent(Event):
     Sends Signal from Strategy to Portfolio object
     """
 
-    def __init__(self, side, leverage):
+    def __init__(self, side, leverage, limit=None, symbol="SPY"):
         """
         Parameters:
         side - long or short
@@ -62,6 +62,12 @@ class SignalEvent(Event):
         self.type = 'SIGNAL'
         self.side = side
         self.leverage = leverage
+        self.symbol = symbol
+        self.limit = limit
+
+    def __str__(self):
+        return json.dumps({'timestamp': str(self.timestamp), 'event': "SIGNAL", 'symbol': self.symbol,
+                           'side': self.side, 'leverage': self.leverage, 'limit': self.limit}) + "\n"
 
 
 class OrderEvent(Event):
@@ -98,7 +104,7 @@ class FillEvent(Event):
     """
 
     def __init__(self, timestamp, symbol, exchange, quantity,
-                 side, total_cost, orderid):
+                 side, total_cost, orderid, price):
         """
         Parameters:
         timestamp - order_timestamp (timestamp is event timestamp)
@@ -118,12 +124,13 @@ class FillEvent(Event):
         self.side = side
         self.total_cost = total_cost
         self.orderid = orderid
+        self.price = price
 
     def __str__(self):
         return json.dumps({'timestamp': str(self.timestamp), 'event': "FILL", 'symbol': self.symbol,
                            'order_timestamp': str(self.order_timestamp), 'quantity': self.quantity,
                            'side': self.side, 'total_cost': self.total_cost, 'exchange': self.exchange,
-                           'orderid': self.orderid}) + "\n"
+                           'orderid': self.orderid, 'price': self.price}) + "\n"
 
 
 if __name__ == "__main__":
