@@ -103,5 +103,5 @@ class QueuePreprocessor(object):
                 print element.type
             if logging:
                 with open(logfile, 'a') as x:
-                    x.write(now.strftime('%m/%d-%H:%M:%S') + "," + element.type + "," + str(element))
+                    x.write(now.strftime('%m/%d-%H:%M:%S') + "," + element.type + "," + str(element) + "\n")
                     #time.sleep(0.001)

@@ -1,5 +1,7 @@
 __author__ = 'jph'
 
+from math import floor
+
 from lib.events import OrderEvent
 
 
@@ -41,7 +43,7 @@ class SimPortfolio(Portfolio):
         if startportfolio is not None:
             self.positions = startportfolio
         self.netliq = self.capital + sum(
-            (self.positions[x]['price'] * self.positions[x]['shares'] for x in self.positions ))
+            (self.positions[x]['price'] * self.positions[x]['shares'] for x in self.positions))
 
     def get_signal(self, event):
         """
@@ -54,6 +56,7 @@ class SimPortfolio(Portfolio):
         targetsize = leverage * self.netliq / self.positions[symbol]['price']
         currentsize = self.positions[symbol]['shares']
         ordersize = targetsize - currentsize if side == "BUY" else targetsize + currentsize
+        ordersize = floor(ordersize)
         type = "MKT" if limit is None else "LMT"
         order = OrderEvent(symbol, side, type, ordersize, limit=limit)
         self.queue.put(order)
@@ -75,3 +78,5 @@ class SimPortfolio(Portfolio):
             self.positions[symbol] = {'shares': quantity, 'price': price}
 
         self.capital -= price * quantity + commission
+        self.netliq = self.capital + sum(
+            (self.positions[x]['price'] * self.positions[x]['shares'] for x in self.positions))

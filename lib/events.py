@@ -24,7 +24,7 @@ class Event(object):
         self.type = None
 
     def __str__(self):
-        return json.dumps({'timestamp': str(self.timestamp), 'event': self.type}) + "\n"
+        return json.dumps({'timestamp': str(self.timestamp), 'event': self.type})
 
 
 class StartStopEvent(Event):
@@ -67,7 +67,7 @@ class SignalEvent(Event):
 
     def __str__(self):
         return json.dumps({'timestamp': str(self.timestamp), 'event': "SIGNAL", 'symbol': self.symbol,
-                           'side': self.side, 'leverage': self.leverage, 'limit': self.limit}) + "\n"
+                           'side': self.side, 'leverage': self.leverage, 'limit': self.limit})
 
 
 class OrderEvent(Event):
@@ -95,7 +95,7 @@ class OrderEvent(Event):
     def __str__(self):
         #TODO include other kwargs
         return json.dumps({'timestamp': str(self.timestamp), 'event': "ORDER", 'symbol': self.symbol,
-                           'order_type': self.order_type, 'quantity': self.quantity, 'side': self.side}) + "\n"
+                           'order_type': self.order_type, 'quantity': self.quantity, 'side': self.side})
 
 
 class FillEvent(Event):
@@ -130,7 +130,7 @@ class FillEvent(Event):
         return json.dumps({'timestamp': str(self.timestamp), 'event': "FILL", 'symbol': self.symbol,
                            'order_timestamp': str(self.order_timestamp), 'quantity': self.quantity,
                            'side': self.side, 'total_cost': self.total_cost, 'exchange': self.exchange,
-                           'orderid': self.orderid, 'price': self.price}) + "\n"
+                           'orderid': self.orderid, 'price': self.price})
 
 
 if __name__ == "__main__":
