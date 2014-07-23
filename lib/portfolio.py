@@ -13,7 +13,7 @@ class Portfolio(object):
     def __init__(self, queue):
         self.queue = queue
         self.capital = 0
-        self.positions = {}
+        self.positions = {'SPY': {'price': 0, 'shares': 0}}
         self.updated = 0
 
     def get_signal(self, event):
@@ -60,6 +60,12 @@ class SimPortfolio(Portfolio):
         type = "MKT" if limit is None else "LMT"
         order = OrderEvent(symbol, side, type, ordersize, limit=limit)
         self.queue.put(order)
+
+    def update_portfolio(self, datahandler):
+        spy_price = round(datahandler.get_latest_data()['close'][0], 2)
+        self.positions['SPY']['price'] = spy_price
+        self.netliq = self.capital + sum(
+            (self.positions[x]['price'] * self.positions[x]['shares'] for x in self.positions))
 
     def get_fill(self, event):
         """
