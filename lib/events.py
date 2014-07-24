@@ -52,7 +52,7 @@ class SignalEvent(Event):
     Sends Signal from Strategy to Portfolio object
     """
 
-    def __init__(self, side, leverage, limit=None, symbol="SPY"):
+    def __init__(self, side, leverage, limit=None, trigger=None, symbol="SPY"):
         """
         Parameters:
         side - long or short
@@ -64,10 +64,11 @@ class SignalEvent(Event):
         self.leverage = leverage
         self.symbol = symbol
         self.limit = limit
+        self.trigger = trigger
 
     def __str__(self):
         return json.dumps({'timestamp': str(self.timestamp), 'event': "SIGNAL", 'symbol': self.symbol,
-                           'side': self.side, 'leverage': self.leverage, 'limit': self.limit})
+                           'side': self.side, 'leverage': self.leverage, 'limit': self.limit, 'trigger': self.trigger})
 
 
 class OrderEvent(Event):
@@ -75,7 +76,7 @@ class OrderEvent(Event):
     Sends Order from Portfolio object to Execution System
     """
 
-    def __init__(self, symbol, side, order_type, quantity, **kwargs):
+    def __init__(self, symbol, side, order_type, quantity, limit=None, trigger=None, **kwargs):
         """
         Parameters:
         symbol
@@ -90,12 +91,15 @@ class OrderEvent(Event):
         self.order_type = order_type
         self.quantity = quantity
         self.side = side
+        self.limit = limit
+        self.trigger = trigger
         self.other_args = kwargs
 
     def __str__(self):
         #TODO include other kwargs
         return json.dumps({'timestamp': str(self.timestamp), 'event': "ORDER", 'symbol': self.symbol,
-                           'order_type': self.order_type, 'quantity': self.quantity, 'side': self.side})
+                           'order_type': self.order_type, 'quantity': self.quantity, 'side': self.side,
+                           'limit': self.limit, 'trigger': self.trigger})
 
 
 class FillEvent(Event):

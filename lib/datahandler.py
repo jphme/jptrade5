@@ -44,7 +44,13 @@ class BacktestDataHandler(DataHandler):
         """
         get latest marketdata for symbol and create MarketEvent if new data available
         """
-        return self.data.ix[-n:]
+        return self.data.ix[-n - 1:-1]
+
+    def get_execution_data(self, symbol='SPY'):
+        """
+        get latest bar - only for backtest execution simulation
+        """
+        return self.data.ix[-1]  #TODO test and change get_latest_data
 
     def data_event(self):
         try:

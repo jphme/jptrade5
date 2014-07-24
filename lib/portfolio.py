@@ -53,13 +53,18 @@ class SimPortfolio(Portfolio):
         leverage = event.leverage
         symbol = event.symbol
         limit = event.limit
-        targetsize = leverage * self.netliq / self.positions[symbol]['price']
-        currentsize = self.positions[symbol]['shares']
-        ordersize = targetsize - currentsize if side == "BUY" else targetsize + currentsize
-        ordersize = floor(ordersize)
-        type = "MKT" if limit is None else "LMT"
-        order = OrderEvent(symbol, side, type, ordersize, limit=limit)
-        self.queue.put(order)
+        trigger = event.trigger
+        if side == "BUY" or side == "SELL":
+            targetsize = leverage * self.netliq / self.positions[symbol]['price']
+            currentsize = self.positions[symbol]['shares']
+            ordersize = targetsize - currentsize if side == "BUY" else targetsize + currentsize
+            ordersize = floor(ordersize)
+            type = "MKT" if limit is None else "LMT"
+            order = OrderEvent(symbol, side, type, ordersize, limit=limit, trigger=trigger)
+            self.queue.put(order)
+
+    #TODO Portfolio must be aware of different trigger/limit levels and timeframes and generate
+    #orders dynamically based on the current portfolio situation
 
     def update_portfolio(self, datahandler):
         spy_price = round(datahandler.get_latest_data()['close'][0], 2)
