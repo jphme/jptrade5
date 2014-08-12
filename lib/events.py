@@ -128,7 +128,7 @@ class FillEvent(Event):
     """
 
     def __init__(self, timestamp, symbol, exchange, quantity,
-                 side, total_cost, orderid, price, ordereventid=None):
+                 side, total_cost, orderid, price, ordereventid=None, permid=None, signalid=None):
         """
         Parameters:
         timestamp - order_timestamp (timestamp is event timestamp)
@@ -150,12 +150,15 @@ class FillEvent(Event):
         self.orderid = orderid
         self.price = price
         self.ordereventid = ordereventid
+        self.permid = permid
+        self.signalid = signalid
 
     def __str__(self):
         return json.dumps({'timestamp': str(self.timestamp), 'id': self.id, 'event': "FILL", 'symbol': self.symbol,
                            'order_timestamp': str(self.order_timestamp), 'quantity': self.quantity,
                            'side': self.side, 'total_cost': self.total_cost, 'exchange': self.exchange,
-                           'orderid': self.orderid, 'price': self.price, 'ordereventid': self.ordereventid})
+                           'orderid': self.orderid, 'price': self.price, 'ordereventid': self.ordereventid,
+                           'permid': self.permid, 'signalid': self.signalid})
 
 
 if __name__ == "__main__":

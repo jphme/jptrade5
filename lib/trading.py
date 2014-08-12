@@ -2,6 +2,10 @@ __author__ = 'jph'
 
 import datetime as dt
 import random
+import threading
+import time
+
+import pytz
 
 from lib.events import FillEvent
 
@@ -14,6 +18,8 @@ class TradingHandler(object):
 
     def __init__(self, queue):
         self.queue = queue
+        self.est = pytz.timezone('US/Eastern')
+        self.cet = pytz.timezone('Europe/Berlin')
 
     def execute_order(self, event):
         """
@@ -28,7 +34,7 @@ class FakeInstantTradingHandler(TradingHandler):
     """
 
     def __init__(self, queue):
-        super(FakeInstantTradingHandler, self).__init__(queue=queue)
+        super(FakeInstantTradingHandler, self).__init__(queue)
         self.fakeid = 37
 
     def execute_order(self, event):
@@ -45,7 +51,7 @@ class FakeBacktestTradingHandler(TradingHandler):
     """
 
     def __init__(self, queue):
-        super(FakeBacktestTradingHandler, self).__init__(queue=queue)
+        super(FakeBacktestTradingHandler, self).__init__(queue)
         self.fakeid = 37
         self.lastprice = None
 
@@ -110,3 +116,66 @@ class FakeBacktestTradingHandler(TradingHandler):
                                            price, ordereventid=event.id)
                     self.fakeid += 1
                     self.queue.put(fill_event)
+
+
+class IBTradingHandler(TradingHandler):
+    """
+    simulates fills in a backtesting environment
+    """
+
+    def __init__(self, queue, ibcon):
+        super(IBTradingHandler, self).__init__(queue)
+        self.ibcon = ibcon
+        self.lastprice = None
+        self.open_orders = {}
+        self.get_fills()
+
+    def update_prices(self):
+        self.lastprice = self.ibcon.getspy()['last']
+
+    def execute_order(self, event):
+        side = event.side
+        symbol = event.symbol
+        size = event.quantity
+        ordertype = event.order_type
+
+        if ordertype == "LMT":
+            lmtprice = event.limit
+        else:
+            lmtprice = 0
+        if event.trigger is not None:
+            stpprice = event.trigger
+            ordertype = "STP" if ordertype == "MKT" else "STPLMT"
+        else:
+            stpprice = 0
+
+        tif = "GTD"
+        goodtill = self.cet.localize(dt.datetime.today() + dt.timedelta(minutes=5))
+
+        self.open_orders[self.ibcon.nextID] = {'ordereventid': event.id, 'signalid': event.signalid}
+        self.ibcon.place_order(side, symbol, size, ordertype, stpprice=stpprice, lmtprice=lmtprice, rth=1, tif=tif,
+                               goodtill=goodtill, orderref=str(event.id))
+
+    def get_fills(self):
+        def check_orders():
+            while True:
+                fertig = []
+                for order in self.open_orders:
+                    if order in self.ibcon.orders:
+                        if self.ibcon.orders[order]['status'] == "Filled":
+                            fill_event = FillEvent(dt.datetime.today(), self.ibcon.orders[order]['symbol'], 'SMART',
+                                                   self.ibcon.orders[order]['filled'], self.ibcon.orders[order]['side'],
+                                                   self.ibcon.orders[order]['filled'] * 0.01, order,
+                                                   self.ibcon.orders[order]['avgfillprice'],
+                                                   ordereventid=self.open_orders[order]['ordereventid'],
+                                                   permid=self.ibcon.orders[order]['permid'],
+                                                   signalid=self.open_orders[order]['signalid'])
+                            self.queue.put(fill_event)
+                            fertig.append(order)
+                for order_finished in fertig:
+                    del self.open_orders[order_finished]
+                time.sleep(1)
+
+        t = threading.Thread(target=check_orders, name="check_orders")
+        t.daemon = True
+        t.start()
