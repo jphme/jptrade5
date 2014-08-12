@@ -259,7 +259,7 @@ class IBComfort(IBInterface):
     def comf_reqhistdata(self, last_date, first_date, symbol, interval="1 W", resol="1 hour", rth=0, show="TRADES",
                          type="STK", exch="SMART", expiry=None, expired=False):
         resols = {'1 day': dt.timedelta(days=90), '1 hour': dt.timedelta(days=6), '15 mins': dt.timedelta(days=6),
-                  '1 min': dt.timedelta(days=1), '1 secs': dt.timedelta(minutes=30)}
+                  '1 min': dt.timedelta(days=2), '1 secs': dt.timedelta(minutes=30)}
         if interval == "1 M": resols['1 hour'] = dt.timedelta(days=28)
         if last_date.hour == 0 and last_date.minute == 0:
             last_date = last_date.replace(hour=23, minute=59)
@@ -293,7 +293,7 @@ class IBComfort(IBInterface):
 
     def wait_for_hist(self, id, interval):
         quote_fields = ('high', 'close', 'volume', 'low', 'open')
-        mindates = {'1 W': 4, '1 D': 1, '1 M': 15}
+        mindates = {'1 W': 4, '1 D': 1, '1 M': 15, '300 S': 5}
         minlen = mindates[interval] if interval in mindates else 8
         tmp = copy.copy(self.hist_prices[id])
         #checks if histkurse still changing and if all dates in histkurse are complete
@@ -318,6 +318,55 @@ class IBComfort(IBInterface):
         only for testing
         """
         return self.orders
+
+    def new_bars(self, only_ask=False, freq="1m1d", current_index=None):
+        jetzt = self.cet.localize(dt.datetime.today()).astimezone(self.est)
+        start_data = jetzt if current_index is None else current_index[-1]
+        freqinfo = {
+        '15m': {'interva': '1 W', 'resol': '15 mins', 'mindelta': dt.timedelta(minutes=13), 'until': start_data},
+        #until koennte auch z.b. spy.index[-1]
+        '15m1d': {'interva': '1 D', 'resol': '15 mins', 'mindelta': dt.timedelta(minutes=13), 'until': jetzt},
+        '1h': {'interva': '1 W', 'resol': '1 hour', 'mindelta': dt.timedelta(minutes=57), 'until': start_data},
+        '1m': {'interva': '2 D', 'resol': '1 min', 'mindelta': dt.timedelta(seconds=50), 'until': start_data},
+        '1m1d': {'interva': '300 S', 'resol': '1 min', 'mindelta': dt.timedelta(seconds=50), 'until': jetzt}}
+        interva = freqinfo[freq]['interva']
+        resol = freqinfo[freq]['resol']
+        mindelta = freqinfo[freq]['mindelta']
+        until = freqinfo[freq]['until']
+
+        if only_ask:
+            newdata = self.comf_reqhistdata(jetzt, jetzt, "SPY", interval=interva, resol=resol, show='ASK')
+        else:
+            newdata = self.comf_reqhistdata(jetzt, until, "SPY", interval=interva, resol=resol, show='TRADES')
+            biddata = self.comf_reqhistdata(jetzt, until, "SPY", interval=interva, resol=resol, show='BID')
+            askdata = self.comf_reqhistdata(jetzt, until, "SPY", interval=interva, resol=resol, show='ASK')
+
+            if newdata is not None and biddata is not None and askdata is not None:
+                askdata = askdata.reindex(newdata.index)
+                biddata = biddata.reindex(newdata.index)
+                bed_high = newdata.high > askdata.high
+                bed_low = newdata.low < biddata.low
+                newdata.high[bed_high] = askdata.high
+                newdata.low[bed_low] = biddata.low
+                bed_open_high = newdata.open > askdata.high
+                bed_open_low = newdata.open < biddata.low
+                bed_close_high = newdata.close > askdata.high
+                bed_close_low = newdata.close < biddata.low
+                newdata.open[bed_open_high] = askdata.high
+                newdata.open[bed_open_low] = biddata.low
+                newdata.close[bed_close_high] = askdata.high
+                newdata.close[bed_close_low] = biddata.low
+                newdata.volume = newdata.volume * 100
+            else:
+                return None
+
+        if newdata is not None:
+            now = self.cet.localize(dt.datetime.today()).astimezone(self.est)
+            if now - newdata.index[-1] < mindelta:
+                newdata = newdata.iloc[:-1, :]
+            newdata = newdata.drop(['count', 'gaps', 'wap', 'volume'], 1)
+            return newdata
+        return None
 
 
 if __name__ == '__main__':

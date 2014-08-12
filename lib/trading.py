@@ -34,7 +34,7 @@ class FakeInstantTradingHandler(TradingHandler):
     def execute_order(self, event):
         price = 190 + round(random.random() * 10, 2)
         fill_event = FillEvent(dt.datetime.today(), event.symbol,
-                               'BATS', event.quantity, event.side, 2, self.fakeid, price)
+                               'BATS', event.quantity, event.side, 2, self.fakeid, price, ordereventid=event.id)
         self.fakeid += 1
         self.queue.put(fill_event)
 
@@ -55,28 +55,58 @@ class FakeBacktestTradingHandler(TradingHandler):
     def execute_order(self, event):
         if event.order_type == "MKT":
             if event.trigger is None:
+                #MKT Order without Trigger
                 price = self.lastprice['open']
                 fill_event = FillEvent(dt.datetime.today(), event.symbol,
-                                       'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid, price)
+                                       'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid, price,
+                                       ordereventid=event.id)
                 self.fakeid += 1
                 self.queue.put(fill_event)
             else:
-                pass
-                #TODO Trigger condiditon
+                #Trigger set
+                if event.side == "BUY":
+                    if event.trigger < self.lastprice['high']:
+                        if event.trigger < self.lastprice['open']:
+                            price = self.lastprice['open']
+                        else:
+                            price = event.trigger
+                        fill_event = FillEvent(dt.datetime.today(), event.symbol,
+                                               'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
+                                               price, ordereventid=event.id)
+                        self.fakeid += 1
+                        self.queue.put(fill_event)
+                if event.side == "SELL":
+                    if event.trigger > self.lastprice['low']:
+                        if event.trigger > self.lastprice['open']:
+                            price = self.lastprice['open']
+                        else:
+                            price = event.trigger
+                        fill_event = FillEvent(dt.datetime.today(), event.symbol,
+                                               'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
+                                               price, ordereventid=event.id)
+                        self.fakeid += 1
+                        self.queue.put(fill_event)
+
         elif event.order_type == "LMT":
             if event.side == "BUY":
                 if event.limit > self.lastprice['low']:
-                    price = event.limit
+                    if event.limit > self.lastprice['open']:
+                        price = self.lastprice['open']
+                    else:
+                        price = event.limit
                     fill_event = FillEvent(dt.datetime.today(), event.symbol,
                                            'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
-                                           price)
+                                           price, ordereventid=event.id)
                     self.fakeid += 1
                     self.queue.put(fill_event)
             elif event.side == "SELL":
                 if event.limit < self.lastprice['high']:
-                    price = event.limit
+                    if event.limit < self.lastprice['open']:
+                        price = self.lastprice['open']
+                    else:
+                        price = event.limit
                     fill_event = FillEvent(dt.datetime.today(), event.symbol,
                                            'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
-                                           price)
+                                           price, ordereventid=event.id)
                     self.fakeid += 1
                     self.queue.put(fill_event)

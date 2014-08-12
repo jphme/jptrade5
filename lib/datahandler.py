@@ -50,7 +50,7 @@ class BacktestDataHandler(DataHandler):
         """
         get latest bar - only for backtest execution simulation
         """
-        return self.data.ix[-1]  #TODO test and change get_latest_data
+        return self.data.ix[-1]
 
     def data_event(self):
         try:
@@ -67,3 +67,36 @@ class BacktestDataHandler(DataHandler):
         Standard pickle
         """
         self.data = pickle.load(open(workfile, 'rb'))
+
+
+class IBDataHandler(DataHandler):
+    """
+    Basic Data  Handler structure to provide an interface for accessing live or simulated market data
+    """
+
+    def __init__(self, queue, workfile='workfile_tmp.p', ibcon=None):
+        super(IBDataHandler, self).__init__(queue)
+        self.read_data(workfile)
+        self.ibcon = ibcon
+
+    def get_latest_data(self, symbol='SPY', n=1):
+        return self.data.ix[-n:]
+
+    def data_event(self):
+        try:
+            newdata = self.ibcon.new_bars()
+            self.data = self.data.combine_first(newdata)
+            self.queue.put(MarketDataEvent())
+        except IndexError:
+            self.queue.put(StartStopEvent())
+
+    def read_data(self, workfile='workfile_tmp.p'):
+        """
+        Initializes database from workfile
+        Standard pickle
+        """
+        self.data = pickle.load(open(workfile, 'rb'))
+
+    def refresh_data(self):
+        #TODO implement method for first time start every day or after crash - refresh workfile until now
+        raise NotImplementedError

@@ -1,8 +1,9 @@
 __author__ = 'jph'
 
 from math import floor
+import threading
 
-from lib.events import OrderEvent
+from lib.events import OrderEvent, ErrorEvent, SignalEvent
 
 
 class Portfolio(object):
@@ -28,6 +29,23 @@ class Portfolio(object):
         """
         raise NotImplementedError
 
+    def close_signal(self, event):
+        side = "BUY" if event.side == "SELL" else "SELL"
+        leverage = event.leverage
+        symbol = event.symbol
+        trigger = event.trigger
+        timetillclose = event.duration
+        parent = event.id
+        close_event = SignalEvent(side, leverage, limit=None, trigger=trigger, symbol=symbol, duration=None,
+                                  parent=parent)
+
+        def place_close_event(event):
+            self.queue.put(event)
+
+        t = threading.Timer(timetillclose * 60, place_close_event, args=[close_event])
+        t.start()
+        return t
+
 
 class SimPortfolio(Portfolio):
     """
@@ -44,6 +62,7 @@ class SimPortfolio(Portfolio):
             self.positions = startportfolio
         self.netliq = self.capital + sum(
             (self.positions[x]['price'] * self.positions[x]['shares'] for x in self.positions))
+        self.signals = {}
 
     def get_signal(self, event):
         """
@@ -54,17 +73,17 @@ class SimPortfolio(Portfolio):
         symbol = event.symbol
         limit = event.limit
         trigger = event.trigger
+        signalid = event.id
         if side == "BUY" or side == "SELL":
             targetsize = leverage * self.netliq / self.positions[symbol]['price']
-            currentsize = self.positions[symbol]['shares']
-            ordersize = targetsize - currentsize if side == "BUY" else targetsize + currentsize
-            ordersize = floor(ordersize)
+            ordersize = floor(targetsize)
             type = "MKT" if limit is None else "LMT"
-            order = OrderEvent(symbol, side, type, ordersize, limit=limit, trigger=trigger)
+            order = OrderEvent(symbol, side, type, ordersize, limit=limit, trigger=trigger, signalid=signalid)
             self.queue.put(order)
-
-    #TODO Portfolio must be aware of different trigger/limit levels and timeframes and generate
-    #orders dynamically based on the current portfolio situation
+            if event.duration is not None:
+                self.close_signal(event)
+        else:
+            self.queue.put(ErrorEvent('Signal not Buy or Sell'))
 
     def update_portfolio(self, datahandler):
         spy_price = round(datahandler.get_latest_data()['close'][0], 2)
