@@ -66,3 +66,23 @@ class BacktestScheduler(EventScheduler):
             elif event.type == "FILL":
                 self.portfolio.get_fill(event)
 
+
+class IBScheduler(EventScheduler):
+    def __init__(self, queue, datahandler, strategy, portfolio, trader, verbose=True):
+        super(IBScheduler, self).__init__(queue, datahandler, strategy, portfolio, trader)
+        self.old_signal = None
+        self.verbose = verbose
+
+    def process_events(self):
+        while True:
+            event = self.queue.get()
+            if self.verbose:
+                print event
+            if event.type == "MARKET":
+                self.strategy.calculate_signals()
+            elif event.type == "SIGNAL":
+                self.portfolio.get_signal(event)
+            elif event.type == "ORDER":
+                self.trader.execute_order(event)
+            elif event.type == "FILL":
+                self.portfolio.get_fill(event)

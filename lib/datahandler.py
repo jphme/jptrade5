@@ -3,6 +3,8 @@ __author__ = 'jph'
 import pickle
 from math import floor
 
+import pytz
+
 from events import MarketDataEvent, StartStopEvent
 
 
@@ -95,8 +97,11 @@ class IBDataHandler(DataHandler):
         Initializes database from workfile
         Standard pickle
         """
+        est = pytz.timezone('US/Eastern')
+        cet = pytz.timezone('Europe/Berlin')
         self.data = pickle.load(open(workfile, 'rb'))
+        self.data = self.data.tz_localize(est)
 
     def refresh_data(self):
-        #TODO implement method for first time start every day or after crash - refresh workfile until now
-        raise NotImplementedError
+        newdata = self.ibcon.new_bars(freq='1m', current_index=self.data.index)
+        self.data = self.data.combine_first(newdata)

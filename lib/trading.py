@@ -162,16 +162,18 @@ class IBTradingHandler(TradingHandler):
                 fertig = []
                 for order in self.open_orders:
                     if order in self.ibcon.orders:
-                        if self.ibcon.orders[order]['status'] == "Filled":
-                            fill_event = FillEvent(dt.datetime.today(), self.ibcon.orders[order]['symbol'], 'SMART',
-                                                   self.ibcon.orders[order]['filled'], self.ibcon.orders[order]['side'],
-                                                   self.ibcon.orders[order]['filled'] * 0.01, order,
-                                                   self.ibcon.orders[order]['avgfillprice'],
-                                                   ordereventid=self.open_orders[order]['ordereventid'],
-                                                   permid=self.ibcon.orders[order]['permid'],
-                                                   signalid=self.open_orders[order]['signalid'])
-                            self.queue.put(fill_event)
-                            fertig.append(order)
+                        if 'status' in self.ibcon.orders[order]:
+                            if self.ibcon.orders[order]['status'] == "Filled":
+                                fill_event = FillEvent(dt.datetime.today(), self.ibcon.orders[order]['symbol'], 'SMART',
+                                                       self.ibcon.orders[order]['filled'],
+                                                       self.ibcon.orders[order]['side'],
+                                                       self.ibcon.orders[order]['filled'] * 0.01, order,
+                                                       self.ibcon.orders[order]['avgfillprice'],
+                                                       ordereventid=self.open_orders[order]['ordereventid'],
+                                                       permid=self.ibcon.orders[order]['permid'],
+                                                       signalid=self.open_orders[order]['signalid'])
+                                self.queue.put(fill_event)
+                                fertig.append(order)
                 for order_finished in fertig:
                     del self.open_orders[order_finished]
                 time.sleep(1)

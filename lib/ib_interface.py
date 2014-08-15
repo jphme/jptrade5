@@ -184,15 +184,15 @@ class IBInterface(object):
         if msg.accountName not in self.accounts:
             self.accounts[msg.accountName] = {'portfolio': {}}
         if msg.key == 'CashBalance':
-            self.accounts[msg.accountName]['cash'] = msg.value
+            self.accounts[msg.accountName]['cash'] = float(msg.value)
         elif msg.key == "MaintMarginReq":
-            self.accounts[msg.accountName]['margin'] = msg.value
+            self.accounts[msg.accountName]['margin'] = float(msg.value)
         elif msg.key == "NetLiquidation":
-            self.accounts[msg.accountName]['netliq'] = msg.value
+            self.accounts[msg.accountName]['netliq'] = float(msg.value)
         elif msg.key == "EquityWithLoanValue":
-            self.accounts[msg.accountName]['equity'] = msg.value
+            self.accounts[msg.accountName]['equity'] = float(msg.value)
         elif msg.key == "PreviousDayEquityWithLoanValue":
-            self.accounts[msg.accountName]['prevequity'] = msg.value
+            self.accounts[msg.accountName]['prevequity'] = float(msg.value)
 
     def portfolio_handler(self, msg):
         """
