@@ -7,7 +7,7 @@ import time
 
 import pytz
 
-from lib.events import FillEvent
+from lib.events import FillEvent, ErrorEvent
 
 
 class TradingHandler(object):
@@ -39,7 +39,7 @@ class FakeInstantTradingHandler(TradingHandler):
 
     def execute_order(self, event):
         price = 190 + round(random.random() * 10, 2)
-        fill_event = FillEvent(dt.datetime.today(), event.symbol,
+        fill_event = FillEvent(event.symbol,
                                'BATS', event.quantity, event.side, 2, self.fakeid, price, ordereventid=event.id)
         self.fakeid += 1
         self.queue.put(fill_event)
@@ -63,7 +63,7 @@ class FakeBacktestTradingHandler(TradingHandler):
             if event.trigger is None:
                 #MKT Order without Trigger
                 price = self.lastprice['open']
-                fill_event = FillEvent(dt.datetime.today(), event.symbol,
+                fill_event = FillEvent(event.symbol,
                                        'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid, price,
                                        ordereventid=event.id)
                 self.fakeid += 1
@@ -76,7 +76,7 @@ class FakeBacktestTradingHandler(TradingHandler):
                             price = self.lastprice['open']
                         else:
                             price = event.trigger
-                        fill_event = FillEvent(dt.datetime.today(), event.symbol,
+                        fill_event = FillEvent(event.symbol,
                                                'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
                                                price, ordereventid=event.id)
                         self.fakeid += 1
@@ -87,7 +87,7 @@ class FakeBacktestTradingHandler(TradingHandler):
                             price = self.lastprice['open']
                         else:
                             price = event.trigger
-                        fill_event = FillEvent(dt.datetime.today(), event.symbol,
+                        fill_event = FillEvent(event.symbol,
                                                'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
                                                price, ordereventid=event.id)
                         self.fakeid += 1
@@ -100,7 +100,7 @@ class FakeBacktestTradingHandler(TradingHandler):
                         price = self.lastprice['open']
                     else:
                         price = event.limit
-                    fill_event = FillEvent(dt.datetime.today(), event.symbol,
+                    fill_event = FillEvent(event.symbol,
                                            'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
                                            price, ordereventid=event.id)
                     self.fakeid += 1
@@ -111,7 +111,7 @@ class FakeBacktestTradingHandler(TradingHandler):
                         price = self.lastprice['open']
                     else:
                         price = event.limit
-                    fill_event = FillEvent(dt.datetime.today(), event.symbol,
+                    fill_event = FillEvent(event.symbol,
                                            'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
                                            price, ordereventid=event.id)
                     self.fakeid += 1
@@ -150,7 +150,8 @@ class IBTradingHandler(TradingHandler):
             stpprice = 0
 
         tif = "GTD"
-        goodtill = self.cet.localize(dt.datetime.today() + dt.timedelta(minutes=5))
+        time_valid = dt.timedelta(minutes=event.time_valid) - dt.timedelta(seconds=1)
+        goodtill = self.cet.localize(dt.datetime.today() + time_valid)
 
         self.open_orders[self.ibcon.nextID] = {'ordereventid': event.id, 'signalid': event.signalid}
         self.ibcon.place_order(side, symbol, size, ordertype, stpprice=stpprice, lmtprice=lmtprice, rth=1, tif=tif,
@@ -158,26 +159,40 @@ class IBTradingHandler(TradingHandler):
 
     def get_fills(self):
         def check_orders():
-            while True:
-                fertig = []
-                for order in self.open_orders:
-                    if order in self.ibcon.orders:
-                        if 'status' in self.ibcon.orders[order]:
-                            if self.ibcon.orders[order]['status'] == "Filled":
-                                fill_event = FillEvent(dt.datetime.today(), self.ibcon.orders[order]['symbol'], 'SMART',
-                                                       self.ibcon.orders[order]['filled'],
-                                                       self.ibcon.orders[order]['side'],
-                                                       self.ibcon.orders[order]['filled'] * 0.01, order,
-                                                       self.ibcon.orders[order]['avgfillprice'],
-                                                       ordereventid=self.open_orders[order]['ordereventid'],
-                                                       permid=self.ibcon.orders[order]['permid'],
-                                                       signalid=self.open_orders[order]['signalid'])
-                                self.queue.put(fill_event)
-                                fertig.append(order)
-                for order_finished in fertig:
-                    del self.open_orders[order_finished]
-                time.sleep(1)
+            try: #TODO raus debug
+                while True:
+                    fertig = []
+                    for order in self.open_orders:
+                        if order in self.ibcon.orders:
+                            if 'status' in self.ibcon.orders[order]:
+                                if self.ibcon.orders[order]['status'] == "Filled":
+                                    ordercost = (self.ibcon.orders[order]['filled'] * 0.005) + \
+                                                (round(self.ibcon.orders[order]['filled'] * self.ibcon.orders[order][
+                                                    'avgfillprice'] * 0.0000221, 2) *
+                                                 (self.ibcon.orders[order]['side'] == "SELL"))
+
+                                    fill_event = FillEvent(self.ibcon.orders[order]['symbol'], 'SMART',
+                                                           self.ibcon.orders[order]['filled'],
+                                                           self.ibcon.orders[order]['side'],
+                                                           ordercost, order,
+                                                           self.ibcon.orders[order]['avgfillprice'],
+                                                           ordereventid=self.open_orders[order]['ordereventid'],
+                                                           permid=self.ibcon.orders[order]['permid'],
+                                                           signalid=self.open_orders[order]['signalid'])
+                                    self.queue.put(fill_event)
+                                    fertig.append(order)
+                    for order_finished in fertig:
+                        del self.open_orders[order_finished]
+                    time.sleep(1)
+            except:
+                import sys
+
+                msg = ", ".join([str(x) for x in sys.exc_info()])
+                print msg
+                self.queue.put(ErrorEvent(msg=msg))
+                raise
 
         t = threading.Thread(target=check_orders, name="check_orders")
         t.daemon = True
         t.start()
+

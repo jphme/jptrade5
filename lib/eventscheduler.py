@@ -1,6 +1,9 @@
 __author__ = 'jph'
 import time
 import threading
+import datetime as dt
+import pytz
+from lib.events import SignalEvent
 
 
 class EventScheduler(object):
@@ -20,28 +23,6 @@ class EventScheduler(object):
 
     def process_events(self):
         raise NotImplementedError
-
-    def schedule_events(self, event, actiontime):
-        #TODO remove if not necessary
-        self.scheduled_events.append((actiontime, event))
-        self.scheduled_events.sort(key=lambda x: x[0])
-        if self.scheduling_thread is not None:
-            self.scheduling_thread.kill()
-        self.scheduling_thread = self.start_scheduling()
-
-    def start_scheduling(self):
-        #TODO remove if not necessary
-        def query_events(events):
-            while time.time() < events[0][0]:
-                time.sleep(0.01)
-            self.queue.put(events[0][1])
-            events = events[1:]
-            query_events(events)
-
-        t = threading.Thread(target=query_events, name="scheduled_events_queue", args=(self.scheduled_events,))
-        t.daemon = True
-        t.start()
-        return t
 
 
 class BacktestScheduler(EventScheduler):
@@ -86,3 +67,40 @@ class IBScheduler(EventScheduler):
                 self.trader.execute_order(event)
             elif event.type == "FILL":
                 self.portfolio.get_fill(event)
+
+    def mainloop(self):
+        est = pytz.timezone('US/Eastern')
+        cet = pytz.timezone('Europe/Berlin')
+        print "Waiting..."
+
+        def heartbeat():
+            while True:
+                jetzt = cet.localize(dt.datetime.today()).astimezone(est)
+                week = jetzt.weekday() not in (5, 6)
+                market_open = (jetzt.hour >= 10) | ((jetzt.hour == 9) & (jetzt.minute >= 31))
+                market_close = jetzt.hour <= 15
+                takt = jetzt.second == 0
+                updated = False
+                if week & market_open & market_close:
+                    if (jetzt.hour == 15) & (jetzt.minute >= 59):
+                        self.queue.put(SignalEvent("CLOSE", 1))
+                        updated = False
+                        time.sleep(61)
+                    elif (jetzt.hour == 9) & (jetzt.minute == 31) & (updated == False):
+                        #self.datahandler.refresh_data()
+                        updated = True
+                        self.portfolio.update_portfolio()
+                        time.sleep(5)
+                    elif takt:
+                        self.datahandler.data_event()
+                        time.sleep(1)
+                    else:
+                        pass
+                else:
+                    pass
+                time.sleep(0.1)
+
+        t = threading.Thread(target=heartbeat, name="mainloop_thread")
+        t.daemon = True
+        t.start()
+        #heartbeat()

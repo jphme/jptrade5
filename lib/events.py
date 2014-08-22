@@ -68,7 +68,8 @@ class SignalEvent(Event):
     Sends Signal from Strategy to Portfolio object
     """
 
-    def __init__(self, side, leverage, limit=None, trigger=None, symbol="SPY", duration=None, parent=None):
+    def __init__(self, side, leverage, limit=None, trigger=None, symbol="SPY", duration=None, parent=None,
+                 time_valid=5):
         """
         Parameters:
         side - long or short
@@ -83,11 +84,13 @@ class SignalEvent(Event):
         self.trigger = trigger
         self.duration = duration
         self.parent = parent
+        self.time_valid = time_valid
 
     def __str__(self):
         return json.dumps({'timestamp': str(self.timestamp), 'id': self.id, 'event': "SIGNAL", 'symbol': self.symbol,
                            'side': self.side, 'leverage': self.leverage, 'limit': self.limit,
-                           'trigger': self.trigger, 'duration': self.duration, 'parent': self.parent})
+                           'trigger': self.trigger, 'duration': self.duration, 'parent': self.parent,
+                           'time_valid': self.time_valid})
 
 
 class OrderEvent(Event):
@@ -95,7 +98,8 @@ class OrderEvent(Event):
     Sends Order from Portfolio object to Execution System
     """
 
-    def __init__(self, symbol, side, order_type, quantity, limit=None, trigger=None, signalid=None, **kwargs):
+    def __init__(self, symbol, side, order_type, quantity, limit=None, trigger=None, signalid=None, time_valid=5,
+                 **kwargs):
         """
         Parameters:
         symbol
@@ -113,13 +117,15 @@ class OrderEvent(Event):
         self.limit = limit
         self.trigger = trigger
         self.signalid = signalid
+        self.time_valid = time_valid
         self.other_args = kwargs
 
     def __str__(self):
         #TODO include other kwargs
         return json.dumps({'timestamp': str(self.timestamp), 'id': self.id, 'event': "ORDER", 'symbol': self.symbol,
                            'order_type': self.order_type, 'quantity': self.quantity, 'side': self.side,
-                           'limit': self.limit, 'trigger': self.trigger, 'signalid': self.signalid})
+                           'limit': self.limit, 'trigger': self.trigger, 'signalid': self.signalid,
+                           'time_valid': self.time_valid})
 
 
 class FillEvent(Event):
@@ -127,7 +133,7 @@ class FillEvent(Event):
     Returns Filled Orders for Logging/Portfolio
     """
 
-    def __init__(self, timestamp, symbol, exchange, quantity,
+    def __init__(self, symbol, exchange, quantity,
                  side, total_cost, orderid, price, ordereventid=None, permid=None, signalid=None):
         """
         Parameters:
@@ -141,7 +147,6 @@ class FillEvent(Event):
         """
         super(FillEvent, self).__init__()
         self.type = 'FILL'
-        self.order_timestamp = timestamp
         self.symbol = symbol
         self.exchange = exchange
         self.quantity = quantity
@@ -155,7 +160,7 @@ class FillEvent(Event):
 
     def __str__(self):
         return json.dumps({'timestamp': str(self.timestamp), 'id': self.id, 'event': "FILL", 'symbol': self.symbol,
-                           'order_timestamp': str(self.order_timestamp), 'quantity': self.quantity,
+                           'quantity': self.quantity,
                            'side': self.side, 'total_cost': self.total_cost, 'exchange': self.exchange,
                            'orderid': self.orderid, 'price': self.price, 'ordereventid': self.ordereventid,
                            'permid': self.permid, 'signalid': self.signalid})

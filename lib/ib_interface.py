@@ -300,7 +300,7 @@ class IBComfort(IBInterface):
         for i in xrange(1000):
             if tmp == self.hist_prices[id]:
                 if self.hist_prices[id]:
-                    if all(k in tmp[dates] for k in quote_fields for dates in tmp) and len(tmp.keys()) > minlen:
+                    if all(k in tmp[dates] for k in quote_fields for dates in tmp) and len(tmp.keys()) >= minlen:
                         return True
             else:
                 tmp = copy.copy(self.hist_prices[id])

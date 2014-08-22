@@ -4,8 +4,9 @@ import pickle
 from math import floor
 
 import pytz
+import pandas as pd
 
-from events import MarketDataEvent, StartStopEvent
+from events import MarketDataEvent, StartStopEvent, ErrorEvent
 
 
 class DataHandler(object):
@@ -85,22 +86,30 @@ class IBDataHandler(DataHandler):
         return self.data.ix[-n:]
 
     def data_event(self):
+        newdata = self.ibcon.new_bars()
         try:
-            newdata = self.ibcon.new_bars()
-            self.data = self.data.combine_first(newdata)
-            self.queue.put(MarketDataEvent())
+            if newdata.index[-1] > self.data.index[-1]:
+                self.data = self.data.combine_first(newdata)
+                self.queue.put(MarketDataEvent())
         except IndexError:
-            self.queue.put(StartStopEvent())
+            if len(self.data) == 0:
+                self.data = newdata
+                self.queue.put(MarketDataEvent())
+            else:
+                self.queue.put(ErrorEvent(msg='Index out of Bounds, data refresh failed...'))
 
-    def read_data(self, workfile='workfile_tmp.p'):
+    def read_data(self, workfile=None):
         """
         Initializes database from workfile
         Standard pickle
         """
         est = pytz.timezone('US/Eastern')
         cet = pytz.timezone('Europe/Berlin')
-        self.data = pickle.load(open(workfile, 'rb'))
-        self.data = self.data.tz_localize(est)
+        if workfile is not None:
+            self.data = pickle.load(open(workfile, 'rb'))
+            self.data = self.data.tz_localize(est)
+        else:
+            self.data = pd.DataFrame()
 
     def refresh_data(self):
         newdata = self.ibcon.new_bars(freq='1m', current_index=self.data.index)
