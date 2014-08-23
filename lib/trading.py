@@ -4,10 +4,11 @@ import datetime as dt
 import random
 import threading
 import time
+from Queue import Queue
 
 import pytz
 
-from lib.events import FillEvent, ErrorEvent
+from lib.events import FillEvent, ErrorEvent, StartStopEvent
 
 
 class TradingHandler(object):
@@ -127,7 +128,7 @@ class IBTradingHandler(TradingHandler):
         super(IBTradingHandler, self).__init__(queue)
         self.ibcon = ibcon
         self.lastprice = None
-        self.open_orders = {}
+        self.open_orders = Queue()
         self.get_fills()
 
     def update_prices(self):
@@ -153,7 +154,7 @@ class IBTradingHandler(TradingHandler):
         time_valid = dt.timedelta(minutes=event.time_valid) - dt.timedelta(seconds=1)
         goodtill = self.cet.localize(dt.datetime.today() + time_valid)
 
-        self.open_orders[self.ibcon.nextID] = {'ordereventid': event.id, 'signalid': event.signalid}
+        self.open_orders.put({'orderid': self.ibcon.nextID, 'ordereventid': event.id, 'signalid': event.signalid})
         self.ibcon.place_order(side, symbol, size, ordertype, stpprice=stpprice, lmtprice=lmtprice, rth=1, tif=tif,
                                goodtill=goodtill, orderref=str(event.id))
 
@@ -161,35 +162,35 @@ class IBTradingHandler(TradingHandler):
         def check_orders():
             try: #TODO raus debug
                 while True:
-                    fertig = []
-                    for order in self.open_orders:
-                        if order in self.ibcon.orders:
-                            if 'status' in self.ibcon.orders[order]:
-                                if self.ibcon.orders[order]['status'] == "Filled":
-                                    ordercost = (self.ibcon.orders[order]['filled'] * 0.005) + \
-                                                (round(self.ibcon.orders[order]['filled'] * self.ibcon.orders[order][
-                                                    'avgfillprice'] * 0.0000221, 2) *
-                                                 (self.ibcon.orders[order]['side'] == "SELL"))
+                    orderdict = self.open_orders.get()
+                    order = orderdict['orderid']
+                    if order in self.ibcon.orders:
+                        if 'status' in self.ibcon.orders[order]:
+                            if self.ibcon.orders[order]['status'] == "Filled":
+                                ordercost = (self.ibcon.orders[order]['filled'] * 0.005) + \
+                                            (round(self.ibcon.orders[order]['filled'] * self.ibcon.orders[order][
+                                                'avgfillprice'] * 0.0000221, 2) *
+                                             (self.ibcon.orders[order]['side'] == "SELL"))
 
-                                    fill_event = FillEvent(self.ibcon.orders[order]['symbol'], 'SMART',
-                                                           self.ibcon.orders[order]['filled'],
-                                                           self.ibcon.orders[order]['side'],
-                                                           ordercost, order,
-                                                           self.ibcon.orders[order]['avgfillprice'],
-                                                           ordereventid=self.open_orders[order]['ordereventid'],
-                                                           permid=self.ibcon.orders[order]['permid'],
-                                                           signalid=self.open_orders[order]['signalid'])
-                                    self.queue.put(fill_event)
-                                    fertig.append(order)
-                    for order_finished in fertig:
-                        del self.open_orders[order_finished]
-                    time.sleep(1)
+                                fill_event = FillEvent(self.ibcon.orders[order]['symbol'], 'SMART',
+                                                       self.ibcon.orders[order]['filled'],
+                                                       self.ibcon.orders[order]['side'],
+                                                       ordercost, order,
+                                                       self.ibcon.orders[order]['avgfillprice'],
+                                                       ordereventid=orderdict['ordereventid'],
+                                                       permid=self.ibcon.orders[order]['permid'],
+                                                       signalid=orderdict['signalid'])
+                                self.queue.put(fill_event)
+                                continue
+                    self.open_orders.put(orderdict)
+                    time.sleep(0.1)
             except:
                 import sys
 
                 msg = ", ".join([str(x) for x in sys.exc_info()])
                 print msg
                 self.queue.put(ErrorEvent(msg=msg))
+                self.queue.put(StartStopEvent())
                 raise
 
         t = threading.Thread(target=check_orders, name="check_orders")
