@@ -44,9 +44,15 @@ class MarketDataEvent(Event):
     Signals incoming new market data
     """
 
-    def __init__(self):
+    def __init__(self, lasttimestamp, close):
         super(MarketDataEvent, self).__init__()
         self.type = 'MARKET'
+        self.lasttimestamp = lasttimestamp
+        self.close = close
+
+    def __str__(self):
+        return json.dumps({'timestamp': str(self.timestamp), 'id': self.id, 'event': self.type,
+                           'lasttimestamp': str(self.lasttimestamp), 'close': self.close})
 
 
 class ErrorEvent(Event):
@@ -164,6 +170,33 @@ class FillEvent(Event):
                            'side': self.side, 'total_cost': self.total_cost, 'exchange': self.exchange,
                            'orderid': self.orderid, 'price': self.price, 'ordereventid': self.ordereventid,
                            'permid': self.permid, 'signalid': self.signalid})
+
+
+class ScheduleEvent(Event):
+    """
+    Returns Filled Orders for Logging/Portfolio
+    """
+
+    def __init__(self, offset=None, childevent=None, cancelid=None, cancelall=False, parent=None):
+        """
+        Parameters:
+        #todo
+        """
+        super(ScheduleEvent, self).__init__()
+        self.type = 'SCHEDULE'
+        self.cancelid = cancelid
+        self.cancelall = cancelall
+        self.offset = offset
+        self.childevent = childevent
+        self.parent = parent
+        self.output_childevent = None if self.childevent is None else self.childevent.id
+
+
+    def __str__(self):
+        return json.dumps(
+            {'timestamp': str(self.timestamp), 'id': self.id, 'event': "SCHEDULE", 'cancelid': self.cancelid,
+             'offset': self.offset, 'cancelall': self.cancelall, 'parent': self.parent,
+             'childevent': self.output_childevent})
 
 
 if __name__ == "__main__":

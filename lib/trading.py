@@ -66,7 +66,7 @@ class FakeBacktestTradingHandler(TradingHandler):
                 price = self.lastprice['open']
                 fill_event = FillEvent(event.symbol,
                                        'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid, price,
-                                       ordereventid=event.id)
+                                       ordereventid=event.id, signalid=event.signalid)
                 self.fakeid += 1
                 self.queue.put(fill_event)
             else:
@@ -79,7 +79,7 @@ class FakeBacktestTradingHandler(TradingHandler):
                             price = event.trigger
                         fill_event = FillEvent(event.symbol,
                                                'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
-                                               price, ordereventid=event.id)
+                                               price, ordereventid=event.id, signalid=event.signalid)
                         self.fakeid += 1
                         self.queue.put(fill_event)
                 if event.side == "SELL":
@@ -90,7 +90,7 @@ class FakeBacktestTradingHandler(TradingHandler):
                             price = event.trigger
                         fill_event = FillEvent(event.symbol,
                                                'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
-                                               price, ordereventid=event.id)
+                                               price, ordereventid=event.id, signalid=event.signalid)
                         self.fakeid += 1
                         self.queue.put(fill_event)
 
@@ -103,7 +103,7 @@ class FakeBacktestTradingHandler(TradingHandler):
                         price = event.limit
                     fill_event = FillEvent(event.symbol,
                                            'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
-                                           price, ordereventid=event.id)
+                                           price, ordereventid=event.id, signalid=event.signalid)
                     self.fakeid += 1
                     self.queue.put(fill_event)
             elif event.side == "SELL":
@@ -114,7 +114,7 @@ class FakeBacktestTradingHandler(TradingHandler):
                         price = event.limit
                     fill_event = FillEvent(event.symbol,
                                            'BATS', event.quantity, event.side, event.quantity * 0.01, self.fakeid,
-                                           price, ordereventid=event.id)
+                                           price, ordereventid=event.id, signalid=event.signalid)
                     self.fakeid += 1
                     self.queue.put(fill_event)
 
@@ -167,10 +167,10 @@ class IBTradingHandler(TradingHandler):
                     if order in self.ibcon.orders:
                         if 'status' in self.ibcon.orders[order]:
                             if self.ibcon.orders[order]['status'] == "Filled":
-                                ordercost = (self.ibcon.orders[order]['filled'] * 0.005) + \
-                                            (round(self.ibcon.orders[order]['filled'] * self.ibcon.orders[order][
-                                                'avgfillprice'] * 0.0000221, 2) *
-                                             (self.ibcon.orders[order]['side'] == "SELL"))
+                                ordercost = round((self.ibcon.orders[order]['filled'] * 0.005) + \
+                                                  (self.ibcon.orders[order]['filled'] * self.ibcon.orders[order][
+                                                      'avgfillprice'] * 0.0000221 * (
+                                                   self.ibcon.orders[order]['side'] == "SELL")), 2)
 
                                 fill_event = FillEvent(self.ibcon.orders[order]['symbol'], 'SMART',
                                                        self.ibcon.orders[order]['filled'],

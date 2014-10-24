@@ -1,5 +1,7 @@
 __author__ = 'jph'
 import json
+import pdb
+
 import pandas as pd
 
 
@@ -34,28 +36,34 @@ def read_logfile(log='log.txt'):
     signal = json_to_workfile(signal)
     order = json_to_workfile(order)
     fill = json_to_workfile(fill)
+    return market, signal, order, fill
 
+
+def calc_costs(fill, signal):
     fills_compare = pd.merge(fill, signal, left_on='signalid', right_on='id', how='left', left_index=True)
-    print fills_compare.head()
-
     difference = abs(fills_compare.trigger - fills_compare.price)
-    print difference.describe()
-
-    print fills_compare.total_cost.describe()
-
-    #todo workaround, sollte gefixt sein
-    commissions = (fills_compare.quantity * 0.005) + (
-        (fills_compare.quantity * fills_compare.price * 0.0000221).apply(lambda x: round(x, 2)) * (
-            fills_compare.side_x == "SELL"))
-
     geskost = (difference * fills_compare.quantity + fills_compare.total_cost) / (
         fills_compare.quantity * fills_compare.price)
-    geskost2 = (difference * fills_compare.quantity + commissions) / (fills_compare.quantity * fills_compare.price)
+
+    return fills_compare, geskost
+
+
+if __name__ == "__main__":
+    market, signal, order, fill = read_logfile('E:\Dev\jptrade5\log_22082014.txt')
+    fills_compare, geskost = calc_costs(fill, signal)
+    print fills_compare.total_cost.describe()
     print geskost.describe()
     print geskost[fills_compare.side_x == "BUY"].describe()
     print geskost[fills_compare.side_x == "SELL"].describe()
 
+    #todo workaround, sollte gefixt sein
+    #commissions = (fills_compare.quantity * 0.005) + (
+    #    (fills_compare.quantity * fills_compare.price * 0.0000221).apply(lambda x: round(x, 2)) * (
+    #        fills_compare.side_x == "SELL"))
+    #geskost2 = (difference * fills_compare.quantity + commissions) / (fills_compare.quantity * fills_compare.price)
+
+    pdb.set_trace()
+
     print
 
 
-read_logfile('E:\Dev\jptrade5\log_21082014.txt')

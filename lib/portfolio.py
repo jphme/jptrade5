@@ -113,8 +113,8 @@ class SimPortfolio(Portfolio):
     startportfolio - dict, starting positions
     """
 
-    def __init__(self, queue, capital=1000000.0, startportfolio=None):
-        super(SimPortfolio, self).__init__(queue=queue)
+    def __init__(self, queue, capital=1000000.0, startportfolio=None, max_leverage=1):
+        super(SimPortfolio, self).__init__(queue=queue, max_leverage=max_leverage)
         self.capital = capital
         if startportfolio is not None:
             self.positions = startportfolio
@@ -127,6 +127,7 @@ class SimPortfolio(Portfolio):
         self.positions['SPY']['price'] = spy_price
         self.netliq = self.capital + sum(
             (self.positions[x]['price'] * self.positions[x]['position'] for x in self.positions))
+        self.get_gesordersize()
 
 
 class IBPortfolio(Portfolio):
@@ -136,8 +137,8 @@ class IBPortfolio(Portfolio):
     IBcon - IBComfort Instance, must be connected
     """
 
-    def __init__(self, queue, ibcon):
-        super(IBPortfolio, self).__init__(queue=queue)
+    def __init__(self, queue, ibcon, max_leverage=1):
+        super(IBPortfolio, self).__init__(queue=queue, max_leverage=max_leverage)
         self.ibcon = ibcon
         self.update_portfolio()
         self.get_gesordersize('SPY')
@@ -150,3 +151,5 @@ class IBPortfolio(Portfolio):
         if 'SPY' not in self.positions:
             self.positions['SPY'] = {'price': 0.0, 'position': 0}
         self.positions['SPY']['price'] = self.ibcon.getspy()['last']
+        if self.positions['SPY']['price'] is None:
+            self.positions['SPY']['price'] = 0

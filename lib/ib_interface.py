@@ -279,7 +279,7 @@ class IBComfort(IBInterface):
             last_date = last_date - resols[resol]
             if not self.wait_for_hist(id, interval): #waits for results
                 print "Fehler, keine Daten empfangen"
-                print self.hist_prices
+                print self.hist_prices[id]
                 return None
             erg.update(dict((time.mktime(key.timetuple()), value) for (key, value) in self.hist_prices[id].items()))
             if z % 60 == 0:
@@ -293,7 +293,7 @@ class IBComfort(IBInterface):
 
     def wait_for_hist(self, id, interval):
         quote_fields = ('high', 'close', 'volume', 'low', 'open')
-        mindates = {'1 W': 4, '1 D': 1, '1 M': 15, '300 S': 5}
+        mindates = {'1 W': 4, '1 D': 1, '1 M': 15, '300 S': 4}
         minlen = mindates[interval] if interval in mindates else 8
         tmp = copy.copy(self.hist_prices[id])
         #checks if histkurse still changing and if all dates in histkurse are complete
